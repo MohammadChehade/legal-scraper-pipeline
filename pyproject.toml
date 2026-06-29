@@ -1,0 +1,28 @@
+[project]
+name = "legal-scraper-pipeline"
+version = "0.1.0"
+description = "Scraping pipeline for Irish Workplace Relations legal decisions"
+requires-python = ">=3.12"
+dependencies = [
+    "scrapy>=2.13",
+    "pymongo>=4.10",
+    "boto3>=1.35",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "pydantic-settings>=2.7",
+    "structlog>=24.4",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+]
+
+[tool.uv]
+# Copy packages into .venv instead of hardlinking. Needed because the project
+# lives on E: while uv's cache may sit on C:, and you cannot hardlink across drives.
+link-mode = "copy"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
