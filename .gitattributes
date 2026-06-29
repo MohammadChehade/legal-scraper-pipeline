@@ -1,0 +1,3 @@
+# Normalize all text files to LF in the repo. Keeps line endings consistent
+# across Windows/Linux and avoids CRLF breaking files used inside containers.
+* text=auto eol=lf

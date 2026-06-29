@@ -36,6 +36,8 @@ services:
     image: mongo-express:1.0.2
     container_name: legal-scraper-mongo-express
     restart: unless-stopped
+    # Opt-in only: starts with `docker compose --profile tools up`, not by default.
+    profiles: ["tools"]
     ports:
       - "8081:8081"
     environment:
