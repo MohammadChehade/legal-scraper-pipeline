@@ -1,6 +1,6 @@
 """Central configuration for the pipeline.
 
-Every tunable value is loaded from environment variables (via .env) so that no
+Every tunable value is loaded from environment variables so that no
 connection string, path, or scraping parameter is hardcoded in the logic.
 """
 
@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     minio_region: str = "us-east-1"
     minio_landing_bucket: str = "landing-zone"
     minio_clean_bucket: str = "clean-zone"
+
+    # Target site
+    wrc_search_url: str = "https://www.workplacerelations.ie/en/search/"
 
     # Scraping behaviour
     partition_months: int = 1

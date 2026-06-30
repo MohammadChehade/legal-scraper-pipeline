@@ -1,7 +1,6 @@
 """Scrapy framework settings.
 
-These are the knobs Scrapy itself reads. Where a value is also our concern, we
-pull it from the typed config so there is a single source of truth.
+These are the knobs Scrapy itself reads. We pull it from the typed config so there is a single source .
 """
 
 from legal_scraper.config import get_settings
@@ -17,18 +16,16 @@ NEWSPIDER_MODULE = "legal_scraper.spiders"
 USER_AGENT = config.user_agent
 ROBOTSTXT_OBEY = True
 
-# Concurrency and politeness. Tuned further on Day 4.
 CONCURRENT_REQUESTS = config.concurrent_requests
 DOWNLOAD_DELAY = config.download_delay
 
-# Retry failed requests a few times before giving up.
 RETRY_ENABLED = True
 RETRY_TIMES = config.retry_times
 
 # AutoThrottle adapts the delay to the server's responsiveness.
 AUTOTHROTTLE_ENABLED = config.autothrottle_enabled
 
-# Use the asyncio-based reactor (Scrapy's modern default).
+# Use the asyncio-based reactor
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 FEED_EXPORT_ENCODING = "utf-8"
