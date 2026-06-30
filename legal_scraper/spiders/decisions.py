@@ -65,9 +65,12 @@ class DecisionsSpider(scrapy.Spider):
     async def start(self):
         # Fan out: every body, every partition, starting at page 1.
         partitions = iter_partitions(self.start_date, self.end_date, self.config.partition_months)
+        # Log the real span actually being scraped, so an off-by-one in the date
+        # range is visible at a glance rather than silently dropping a day.
         self.logger.info(
-            "run: %d bodies x %d partitions (%s)",
-            len(self.body_ids), len(partitions), self.config.partition_months,
+            "scraping %s to %s as %d window(s) of %d month(s) across %d body/bodies",
+            partitions[0].from_param, partitions[-1].to_param,
+            len(partitions), self.config.partition_months, len(self.body_ids),
         )
         for body_id in self.body_ids:
             for partition in partitions:

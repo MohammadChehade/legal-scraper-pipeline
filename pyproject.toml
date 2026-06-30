@@ -16,6 +16,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.8",
+    "pytest>=8.3",
 ]
 
 [tool.uv]
@@ -26,3 +27,14 @@ link-mode = "copy"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.pytest.ini_options]
+# Put the project root on sys.path so tests can import legal_scraper directly.
+pythonpath = ["."]
+testpaths = ["tests"]
+# -v names each test, -s lets the per-test explanation prints through,
+# -ra prints an end-of-run summary including skip reasons.
+addopts = "-v -s -ra"
+markers = [
+    "integration: hits the live website; skipped unless --integration is passed",
+]
