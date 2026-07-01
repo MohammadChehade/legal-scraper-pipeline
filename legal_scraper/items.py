@@ -26,3 +26,7 @@ class DecisionItem(scrapy.Item):
     file_path = scrapy.Field()
     file_hash = scrapy.Field()
     scraped_at = scrapy.Field()
+
+    # Transient: the downloaded file bytes. The pipeline hashes and uploads them,
+    # then drops this field so raw bytes never get written into Mongo.
+    content = scrapy.Field()

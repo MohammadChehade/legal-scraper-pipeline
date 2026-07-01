@@ -29,3 +29,8 @@ AUTOTHROTTLE_ENABLED = config.autothrottle_enabled
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 
 FEED_EXPORT_ENCODING = "utf-8"
+
+# Send every scraped item through the storage pipeline (file to MinIO, metadata to Mongo).
+ITEM_PIPELINES = {
+    "legal_scraper.pipelines.StoragePipeline": 300,
+}

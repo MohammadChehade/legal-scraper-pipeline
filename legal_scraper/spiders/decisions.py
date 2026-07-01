@@ -14,6 +14,7 @@ import scrapy
 from legal_scraper.config import get_settings
 from legal_scraper.items import DecisionItem
 from legal_scraper.partitions import iter_partitions
+from legal_scraper.storage.mongo import MongoStore
 
 
 class DecisionsSpider(scrapy.Spider):
@@ -38,6 +39,14 @@ class DecisionsSpider(scrapy.Spider):
             self.body_ids = [b for b in self.BODIES if b in wanted]
         else:
             self.body_ids = list(self.BODIES)
+
+        # Read-side Mongo handle for the idempotency check. Optional, so a Mongo
+        # outage doesn't stop the crawl.
+        try:
+            self.store = MongoStore(self.config.mongo_uri, self.config.mongo_database)
+        except Exception:
+            self.store = None
+            self.logger.warning("Mongo unreachable; the re-download skip is disabled")
 
     @staticmethod
     def _parse_date(value, name):
@@ -102,7 +111,32 @@ class DecisionsSpider(scrapy.Spider):
                     )
 
         for card in cards:
-            yield self._parse_card(card, response, body_name, partition)
+            item = self._parse_card(card, response, body_name, partition)
+            if self._already_stored(item["identifier"]):
+                continue  # already stored on a previous run: don't re-download
+            if item["doc_url"]:
+                # Follow the record's document link so the pipeline can store the
+                # file. parse_document attaches the raw bytes and emits the item.
+                yield scrapy.Request(
+                    item["doc_url"],
+                    callback=self.parse_document,
+                    cb_kwargs={"item": item},
+                )
+            else:
+                yield item
+
+    def parse_document(self, response, item):
+        # The document link has been fetched. Keep its raw bytes on the item for
+        # the pipeline to hash and upload: for an HTML detail page these bytes are
+        # the page itself (stored as .html); for a pdf/doc link they are the binary.
+        item["content"] = response.body
+        yield item
+
+    def _already_stored(self, identifier):
+        # True if a previous run already saved this record.
+        if not self.store or not identifier:
+            return False
+        return self.store.find_by_identifier(self.config.mongo_landing_collection, identifier) is not None
 
     def _parse_card(self, card, response, body_name, partition):
         href = card.css("h2.title a::attr(href)").get()
@@ -121,7 +155,7 @@ class DecisionsSpider(scrapy.Spider):
 
     @staticmethod
     def _extract_total(response):
-        # The listing says "...of 233 results"; whitespace varies, so be lenient.
+        # regex to find the total number of results in the search page text.
         match = re.search(r"of\s+(\d+)\s+results", response.text, re.IGNORECASE)
         return int(match.group(1)) if match else None
 
