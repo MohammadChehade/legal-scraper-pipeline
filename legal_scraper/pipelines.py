@@ -2,6 +2,9 @@
 
 from datetime import datetime, timezone
 
+import structlog
+from scrapy.exceptions import DropItem
+
 from legal_scraper.config import get_settings
 from legal_scraper.storage.minio_store import MinioStore, compute_hash
 from legal_scraper.storage.mongo import MongoStore
@@ -33,26 +36,37 @@ class StoragePipeline:
         self.mongo.close()
 
     def process_item(self, item, spider):
-        content = item.get("content")
-        if content is not None:
-            ext = item.get("doc_type") or "html"
-            key = self._file_key(item, ext)
-            item["file_hash"] = compute_hash(content)
-            item["file_path"] = key
-            item["scraped_at"] = datetime.now(timezone.utc).isoformat()
-            # Only upload if the object isn't already there.
-            if not self.minio.exists(self.bucket, key):
-                content_type = CONTENT_TYPES.get(ext, "application/octet-stream")
-                self.minio.upload(self.bucket, key, content, content_type)
+        try:
+            content = item.get("content")
+            if content is not None:
+                ext = item.get("doc_type") or "html"
+                key = self._file_key(item, ext)
+                item["file_hash"] = compute_hash(content)
+                item["file_path"] = key
+                item["scraped_at"] = datetime.now(timezone.utc).isoformat()
+                # Only upload if the object isn't already there.
+                if not self.minio.exists(self.bucket, key):
+                    content_type = CONTENT_TYPES.get(ext, "application/octet-stream")
+                    self.minio.upload(self.bucket, key, content, content_type)
 
-        # Write metadata keyed on identifier, minus the raw bytes.
-        document = {k: v for k, v in item.items() if k != "content"}
-        self.mongo.upsert(self.collection, item["identifier"], document)
-        if "content" in item:
-            del item["content"]
+            # Write metadata keyed on identifier, minus the raw bytes.
+            document = {k: v for k, v in item.items() if k != "content"}
+            self.mongo.upsert(self.collection, item["identifier"], document)
+        except Exception as exc:
+            structlog.get_logger().error(
+                "store_failed", identifier=item.get("identifier"), error=str(exc)
+            )
+            spider.count_failed(item)
+            raise DropItem(f"store failed for {item.get('identifier')}") from exc
+        finally:
+            if "content" in item:
+                del item["content"]
+
+        spider.count_scraped(item)
         return item
 
     @staticmethod
     def _file_key(item, ext):
+        # e.g.:workplace-relations-commission/2024-01-01/ADJ-....html
         body_slug = item["body"].lower().replace(" ", "-")
         return f"{body_slug}/{item['partition_date']}/{item['identifier']}.{ext}"

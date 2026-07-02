@@ -6,13 +6,16 @@ the search listing pages, and yields one DecisionItem per record.
 
 import math
 import re
+from collections import defaultdict
 from datetime import datetime
 from urllib.parse import urlencode, urlparse
 
 import scrapy
+import structlog
 
 from legal_scraper.config import get_settings
 from legal_scraper.items import DecisionItem
+from legal_scraper.logging_config import configure_json_logging
 from legal_scraper.partitions import iter_partitions
 from legal_scraper.storage.mongo import MongoStore
 
@@ -28,11 +31,13 @@ class DecisionsSpider(scrapy.Spider):
         "15376": "Workplace Relations Commission",
     }
 
-    def __init__(self, start=None, end=None, bodies=None, *args, **kwargs):
+    def __init__(self, start=None, end=None, bodies=None, refresh=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = get_settings()
         self.start_date = self._parse_date(start, "start")
         self.end_date = self._parse_date(end, "end")
+        # -a refresh=true re-scrapes everything, bypassing the already-stored skip.
+        self.refresh = str(refresh).lower() in ("1", "true", "yes")
         # Optional -a bodies=15376,3 restricts the run to specific tribunals.
         if bodies:
             wanted = {b.strip() for b in bodies.split(",")}
@@ -47,6 +52,11 @@ class DecisionsSpider(scrapy.Spider):
         except Exception:
             self.store = None
             self.logger.warning("Mongo unreachable; the re-download skip is disabled")
+
+        # JSON logging and per-partition counters for the run's accounting.
+        configure_json_logging()
+        self.log = structlog.get_logger()
+        self.counts = defaultdict(lambda: {"found": 0, "scraped": 0, "failed": 0, "skipped": 0})
 
     @staticmethod
     def _parse_date(value, name):
@@ -86,6 +96,7 @@ class DecisionsSpider(scrapy.Spider):
                 yield scrapy.Request(
                     self._build_url(body_id, partition, 1),
                     callback=self.parse,
+                    errback=self.on_download_error,
                     cb_kwargs={"body_id": body_id, "partition": partition, "page": 1},
                 )
 
@@ -101,18 +112,21 @@ class DecisionsSpider(scrapy.Spider):
                 "found %s records | body=%s partition=%s",
                 total if total is not None else "?", body_name, partition.partition_date,
             )
+            self.counts[self._key(partition, body_name)]["found"] = total or 0
             if total:
                 last_page = math.ceil(total / page_size)
                 for next_page in range(2, last_page + 1):
                     yield scrapy.Request(
                         self._build_url(body_id, partition, next_page),
                         callback=self.parse,
+                        errback=self.on_download_error,
                         cb_kwargs={"body_id": body_id, "partition": partition, "page": next_page},
                     )
 
         for card in cards:
             item = self._parse_card(card, response, body_name, partition)
             if self._already_stored(item["identifier"]):
+                self.counts[self._key(partition, body_name)]["skipped"] += 1
                 continue  # already stored on a previous run: don't re-download
             if item["doc_url"]:
                 # Follow the record's document link so the pipeline can store the
@@ -120,6 +134,7 @@ class DecisionsSpider(scrapy.Spider):
                 yield scrapy.Request(
                     item["doc_url"],
                     callback=self.parse_document,
+                    errback=self.on_download_error,
                     cb_kwargs={"item": item},
                 )
             else:
@@ -134,9 +149,57 @@ class DecisionsSpider(scrapy.Spider):
 
     def _already_stored(self, identifier):
         # True if a previous run already saved this record.
-        if not self.store or not identifier:
+        if self.refresh or not self.store or not identifier:
             return False
         return self.store.find_by_identifier(self.config.mongo_landing_collection, identifier) is not None
+
+    @staticmethod
+    def _key(partition, body_name):
+        # Counter key: one bucket per partition window and body.
+        return f"{partition.partition_date}|{body_name}"
+
+    @staticmethod
+    def _item_key(item):
+        return f"{item['partition_date']}|{item['body']}"
+
+    def on_download_error(self, failure):
+        # A request failed after retries. Log it with its URL and HTTP status,
+        # and count a document failure so the record is accounted for.
+        request = failure.request
+        response = getattr(failure.value, "response", None)
+        status = getattr(response, "status", None)
+        item = request.cb_kwargs.get("item")
+        if item is not None:
+            self.counts[self._item_key(item)]["failed"] += 1
+            self.log.warning(
+                "download_failed", url=request.url, status=status,
+                error=str(failure.value), identifier=item.get("identifier"),
+            )
+        else:
+            self.log.warning("listing_failed", url=request.url, status=status, error=str(failure.value))
+
+    def count_scraped(self, item):
+        self.counts[self._item_key(item)]["scraped"] += 1
+
+    def count_failed(self, item):
+        self.counts[self._item_key(item)]["failed"] += 1
+
+    def closed(self, reason):
+        # Scrapy calls this when the crawl ends. Emit a JSON summary per partition
+        # and one for the whole run, flagging any records we couldn't account for.
+        totals = {"found": 0, "scraped": 0, "failed": 0, "skipped": 0}
+        for key, counts in self.counts.items():
+            partition, body = key.split("|", 1)
+            missing = max(0, counts["found"] - counts["scraped"] - counts["failed"] - counts["skipped"])
+            self.log.info("partition_summary", partition=partition, body=body, missing=missing, **counts)
+            if missing:
+                self.log.warning("records_unaccounted", partition=partition, body=body, missing=missing)
+            for name in totals:
+                totals[name] += counts[name]
+        total_missing = max(0, totals["found"] - totals["scraped"] - totals["failed"] - totals["skipped"])
+        self.log.info("run_summary", reason=reason, missing=total_missing, **totals)
+        if self.store:
+            self.store.close()
 
     def _parse_card(self, card, response, body_name, partition):
         href = card.css("h2.title a::attr(href)").get()

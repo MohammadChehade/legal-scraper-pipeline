@@ -12,6 +12,7 @@ is correct. On success it prints a summary of what came back.
 """
 
 import json
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -40,9 +41,17 @@ def test_live_scrape_one_week(tmp_path):
             "-a", "start=2024-01-01",
             "-a", "end=2024-01-08",  # exclusive end, so this is the week of the 1st to the 7th
             "-a", "bodies=15376",
+            "-a", "refresh=true",  # bypass the already-stored skip so the test always scrapes
             "-O", str(out),
         ],
         cwd=PROJECT_ROOT,
+        # Isolate the test's writes to a throwaway db and bucket so it never
+        # pollutes the real landing zone. These env vars override .env.
+        env={
+            **os.environ,
+            "MONGO_DATABASE": "legal_scraper_test",
+            "MINIO_LANDING_BUCKET": "test-landing-zone",
+        },
         capture_output=True,
         text=True,
         timeout=180,
