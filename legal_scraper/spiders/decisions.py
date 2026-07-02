@@ -31,13 +31,11 @@ class DecisionsSpider(scrapy.Spider):
         "15376": "Workplace Relations Commission",
     }
 
-    def __init__(self, start=None, end=None, bodies=None, refresh=None, *args, **kwargs):
+    def __init__(self, start=None, end=None, bodies=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config = get_settings()
         self.start_date = self._parse_date(start, "start")
         self.end_date = self._parse_date(end, "end")
-        # -a refresh=true re-scrapes everything, bypassing the already-stored skip.
-        self.refresh = str(refresh).lower() in ("1", "true", "yes")
         # Optional -a bodies=15376,3 restricts the run to specific tribunals.
         if bodies:
             wanted = {b.strip() for b in bodies.split(",")}
@@ -149,7 +147,7 @@ class DecisionsSpider(scrapy.Spider):
 
     def _already_stored(self, identifier):
         # True if a previous run already saved this record.
-        if self.refresh or not self.store or not identifier:
+        if not self.store or not identifier:
             return False
         return self.store.find_by_identifier(self.config.mongo_landing_collection, identifier) is not None
 
