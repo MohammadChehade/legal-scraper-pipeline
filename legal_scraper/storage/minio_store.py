@@ -52,3 +52,7 @@ class MinioStore:
 
     def upload(self, bucket: str, key: str, data: bytes, content_type: str) -> None:
         self.client.put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
+
+    def download(self, bucket: str, key: str) -> bytes:
+        # Read an object's bytes back out of the store.
+        return self.client.get_object(Bucket=bucket, Key=key)["Body"].read()

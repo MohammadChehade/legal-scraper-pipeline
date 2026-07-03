@@ -21,6 +21,10 @@ class MongoStore:
     def find_by_identifier(self, collection: str, identifier: str) -> dict | None:
         return self.db[collection].find_one({"identifier": identifier})
 
+    def find(self, collection: str, query: dict):
+        # Return a cursor for a query, so the caller can stream large result sets.
+        return self.db[collection].find(query)
+
     def upsert(self, collection: str, identifier: str, document: dict) -> None:
         # Update the matching document, or insert it if none exists. Keyed on
         # identifier, so a second run overwrites in place instead of adding a row.
