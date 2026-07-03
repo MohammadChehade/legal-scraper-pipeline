@@ -11,6 +11,8 @@ dependencies = [
     "lxml>=5.3",
     "pydantic-settings>=2.7",
     "structlog>=24.4",
+    "dagster>=1.9",
+    "dagster-webserver>=1.9",
 ]
 
 [dependency-groups]
@@ -27,6 +29,10 @@ link-mode = "copy"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.dagster]
+# Lets `dagster dev` discover the orchestration module without -m.
+module_name = "legal_scraper.orchestration"
 
 [tool.pytest.ini_options]
 # Put the project root on sys.path so tests can import legal_scraper directly.
