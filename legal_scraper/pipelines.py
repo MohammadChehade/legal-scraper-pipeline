@@ -18,7 +18,15 @@ CONTENT_TYPES = {
 
 
 class StoragePipeline:
-    def open_spider(self, spider):
+    @classmethod
+    def from_crawler(cls, crawler):
+        # Scrapy is phasing out the spider argument to pipeline methods, so
+        # keep the crawler and read the running spider from it instead.
+        pipeline = cls()
+        pipeline.crawler = crawler
+        return pipeline
+
+    def open_spider(self):
         config = get_settings()
         self.collection = config.mongo_landing_collection
         self.bucket = config.minio_landing_bucket
@@ -32,10 +40,11 @@ class StoragePipeline:
         )
         self.minio.ensure_bucket(self.bucket)
 
-    def close_spider(self, spider):
+    def close_spider(self):
         self.mongo.close()
 
-    def process_item(self, item, spider):
+    def process_item(self, item):
+        spider = self.crawler.spider
         try:
             content = item.get("content")
             if content is not None:

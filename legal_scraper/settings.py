@@ -22,6 +22,10 @@ DOWNLOAD_DELAY = config.download_delay
 RETRY_ENABLED = True
 RETRY_TIMES = config.retry_times
 
+# INFO keeps the terminal readable: progress stats and our JSON events, without
+# the per-request DEBUG noise from Scrapy and the storage clients.
+LOG_LEVEL = config.log_level
+
 # AutoThrottle adapts the delay to the server's responsiveness.
 AUTOTHROTTLE_ENABLED = config.autothrottle_enabled
 

@@ -46,6 +46,7 @@ def _clean_key(record):
 
 
 def transform(start: str, end: str) -> dict:
+    configure_json_logging()  # so events are JSON however transform is invoked
     config = get_settings()
     log = structlog.get_logger()
 
@@ -91,7 +92,6 @@ def _iso_date(value):
 
 
 def main():
-    configure_json_logging()
     parser = argparse.ArgumentParser(description="Transform landing-zone data into the clean zone.")
     parser.add_argument("--start", required=True, type=_iso_date, help="start date YYYY-MM-DD (inclusive)")
     parser.add_argument("--end", required=True, type=_iso_date, help="end date YYYY-MM-DD (exclusive)")

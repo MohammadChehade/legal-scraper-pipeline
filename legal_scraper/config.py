@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     autothrottle_enabled: bool = True
     retry_times: int = 3
     user_agent: str = "legal-scraper/0.1 (+https://example.com)"
+    log_level: str = "INFO"
 
 
 @lru_cache

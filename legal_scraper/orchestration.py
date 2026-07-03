@@ -22,16 +22,24 @@ class DateRange(Config):
 @asset
 def landing_data(context, config: DateRange) -> dict:
     # Ingest: run the scraper for the date range into the landing zone.
+    # Its output is forwarded line by line into Dagster's event log, so the
+    # run is followable in the UI (stdout capture is unreliable on Windows).
     context.log.info(f"scraping {config.start} to {config.end}")
-    subprocess.run(
-        [
-            sys.executable, "-m", "scrapy", "crawl", "decisions",
-            "-a", f"start={config.start}",
-            "-a", f"end={config.end}",
-        ],
-        cwd=PROJECT_ROOT,
-        check=True,
+    command = [
+        sys.executable, "-m", "scrapy", "crawl", "decisions",
+        "-a", f"start={config.start}",
+        "-a", f"end={config.end}",
+    ]
+    process = subprocess.Popen(
+        command, cwd=PROJECT_ROOT,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace",
     )
+    for line in process.stdout:
+        if line.strip():
+            context.log.info(line.rstrip())
+    if process.wait() != 0:
+        raise subprocess.CalledProcessError(process.returncode, command)
     return {"start": config.start, "end": config.end}
 
 
