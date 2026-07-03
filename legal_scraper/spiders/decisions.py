@@ -140,11 +140,38 @@ class DecisionsSpider(scrapy.Spider):
                 yield item
 
     def parse_document(self, response, item):
-        # The document link has been fetched. Keep its raw bytes on the item for
-        # the pipeline to hash and upload: for an HTML detail page these bytes are
-        # the page itself (stored as .html); for a pdf/doc link they are the binary.
+        # The document link has been fetched. For an HTML detail page that is
+        # just a shell (empty content with the decision attached as a pdf/doc,
+        # as on legacy EAT pages), follow the attachment and store that instead.
+        if item.get("doc_type") == "html":
+            attachment = self._attachment_url(response)
+            if attachment:
+                url = response.urljoin(attachment)
+                item["doc_url"] = url
+                item["doc_type"] = self._doc_type(url)
+                yield scrapy.Request(
+                    url,
+                    callback=self.parse_document,
+                    errback=self.on_download_error,
+                    cb_kwargs={"item": item},
+                )
+                return
+        # Keep the raw bytes on the item for the pipeline to hash and upload:
+        # for an HTML page the page itself (stored as .html), else the binary.
         item["content"] = response.body
         yield item
+
+    @classmethod
+    def _attachment_url(cls, response):
+        # A detail page counts as a shell only if div.content has no text AND
+        # it offers a pdf/doc download. Pages with real content return None.
+        content_text = response.css("div.content").xpath("string(.)").get() or ""
+        if content_text.strip():
+            return None
+        href = response.css("div.related-file a.download::attr(href)").get()
+        if href and cls._doc_type(href) in ("pdf", "doc"):
+            return href
+        return None
 
     def _already_stored(self, identifier):
         # True if a previous run already saved this record.

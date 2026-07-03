@@ -57,9 +57,10 @@ different source sites I would change:
 
 ## Notes
 
-- **Legacy pages.** EAT's pre-2016 pages have no clean content container, so the transform
-  keeps the full page body rather than dropping the document. Modern bodies clean to
-  `div.content`.
-- **PDF/DOC.** The pipeline stores PDF/DOC links as-is and HTML pages as `.html`. Every
-  record observed on this source is HTML, so the binary branch is implemented but not
-  exercised here.
+- **Legacy EAT pages.** EAT detail pages are shells: an empty content container with the
+  decision attached as a PDF. The spider detects this and follows the attachment, storing
+  the PDF itself, so the pipeline captures real decisions rather than page chrome. A shell
+  page without an attachment falls back to storing the page.
+- **PDF/DOC.** PDF/DOC documents are stored as-is and HTML pages as `.html`; the transform
+  cleans HTML and passes binaries through untouched. The modern bodies serve HTML detail
+  pages, and the EAT attachments exercise the PDF path on real data.

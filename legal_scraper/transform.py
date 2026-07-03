@@ -24,9 +24,9 @@ CONTENT_TYPES = {
 
 
 def clean_html(raw: bytes) -> bytes:
-    # Keep the decision body from div.content. Older EAT pages have no usable
-    # content container, so fall back to the full page body rather than drop the
-    # document. Either way, strip scripts and styles.
+    # Keep the decision body from div.content. If a page has no usable content
+    # container, fall back to the full page body rather than drop the document.
+    # Either way, strip scripts and styles.
     soup = BeautifulSoup(raw, "lxml")
     content = soup.select_one("div.content")
     if not content or not content.get_text(strip=True):
