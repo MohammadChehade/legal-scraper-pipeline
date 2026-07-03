@@ -24,10 +24,13 @@ CONTENT_TYPES = {
 
 
 def clean_html(raw: bytes) -> bytes:
-    # The decision body lives in div.content; the header, footer and nav sit
-    # outside it. Keep that block and drop any stray script/style.
+    # Keep the decision body from div.content. Older EAT pages have no usable
+    # content container, so fall back to the full page body rather than drop the
+    # document. Either way, strip scripts and styles.
     soup = BeautifulSoup(raw, "lxml")
-    content = soup.select_one("div.content") or soup.body or soup
+    content = soup.select_one("div.content")
+    if not content or not content.get_text(strip=True):
+        content = soup.body or soup
     for tag in content.find_all(["script", "style"]):
         tag.decompose()
     return str(content).encode("utf-8")
