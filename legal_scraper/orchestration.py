@@ -12,9 +12,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class DateRange(Config):
-    # Materialize with these, or override them in the Dagster launchpad.
-    start: str = "2024-01-01"
-    end: str = "2024-02-01"
+    # Default is June 2012: Equality Tribunal + EAT + Labour Court (3 bodies).
+    # WRC only exists from ~2016, so no single month has all four. For WRC, run a
+    # recent range instead, e.g. start=2024-01-01 end=2024-02-01 (WRC + Labour Court).
+    start: str = "2012-06-01"
+    end: str = "2012-07-01"
 
 
 @asset
