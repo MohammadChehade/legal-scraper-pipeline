@@ -33,8 +33,9 @@ Three layers, keyed on the record `identifier`:
    `identifier`, so a re-run updates in place instead of inserting again.
 2. **No re-downloading.** Before fetching a document, the spider checks whether that
    identifier is already stored and skips it if so.
-3. **File hash.** Every file's SHA-256 is stored, both as the change-detection fingerprint
-   and to skip re-uploading unchanged bytes.
+3. **File hash.** Every file's SHA-256 is stored. When a document is re-fetched, its new
+   hash is compared with the stored one: unchanged bytes are not re-uploaded, changed
+   bytes overwrite the stored copy.
 
 An integration test runs the same range twice and asserts the second run scrapes nothing
 new and creates no duplicates.

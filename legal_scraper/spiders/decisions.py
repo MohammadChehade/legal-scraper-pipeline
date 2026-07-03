@@ -84,10 +84,11 @@ class DecisionsSpider(scrapy.Spider):
         partitions = iter_partitions(self.start_date, self.end_date, self.config.partition_months)
         # Log the real span actually being scraped, so an off-by-one in the date
         # range is visible at a glance rather than silently dropping a day.
-        self.logger.info(
-            "scraping %s to %s as %d window(s) of %d month(s) across %d body/bodies",
-            partitions[0].from_param, partitions[-1].to_param,
-            len(partitions), self.config.partition_months, len(self.body_ids),
+        self.log.info(
+            "run_started",
+            start=partitions[0].from_param, end=partitions[-1].to_param,
+            windows=len(partitions), partition_months=self.config.partition_months,
+            bodies=[self.BODIES[b] for b in self.body_ids],
         )
         for body_id in self.body_ids:
             for partition in partitions:
@@ -106,9 +107,9 @@ class DecisionsSpider(scrapy.Spider):
         if page == 1:
             total = self._extract_total(response)
             page_size = len(cards) or 10
-            self.logger.info(
-                "found %s records | body=%s partition=%s",
-                total if total is not None else "?", body_name, partition.partition_date,
+            self.log.info(
+                "partition_found",
+                partition=partition.partition_date, body=body_name, found=total,
             )
             self.counts[self._key(partition, body_name)]["found"] = total or 0
             if total:

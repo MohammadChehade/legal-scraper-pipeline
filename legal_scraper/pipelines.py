@@ -44,8 +44,10 @@ class StoragePipeline:
                 item["file_hash"] = compute_hash(content)
                 item["file_path"] = key
                 item["scraped_at"] = datetime.now(timezone.utc).isoformat()
-                # Only upload if the object isn't already there.
-                if not self.minio.exists(self.bucket, key):
+                # Hash comparison detects changes between runs: skip the upload
+                # when the stored record already has these bytes, overwrite otherwise.
+                existing = self.mongo.find_by_identifier(self.collection, item["identifier"])
+                if not existing or existing.get("file_hash") != item["file_hash"]:
                     content_type = CONTENT_TYPES.get(ext, "application/octet-stream")
                     self.minio.upload(self.bucket, key, content, content_type)
 

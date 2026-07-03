@@ -2,7 +2,7 @@
 
 MinIO speaks the S3 API, so we use boto3's S3 client pointed at the local MinIO
 endpoint. This wrapper handles the few operations we need: make sure a bucket
-exists, check whether an object is already there, and upload bytes.
+exists, upload bytes, and read them back.
 """
 
 from __future__ import annotations
@@ -40,15 +40,6 @@ class MinioStore:
             self.client.head_bucket(Bucket=bucket)
         except ClientError:
             self.client.create_bucket(Bucket=bucket)
-
-    def exists(self, bucket: str, key: str) -> bool:
-        # A cheap HEAD request: is this object already stored? Used to avoid
-        # re-uploading bytes we already have.
-        try:
-            self.client.head_object(Bucket=bucket, Key=key)
-            return True
-        except ClientError:
-            return False
 
     def upload(self, bucket: str, key: str, data: bytes, content_type: str) -> None:
         self.client.put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
